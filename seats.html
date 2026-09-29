@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookMyShow - Select Seats</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">
+      🎬 <span>BookMyShow</span>
+    </a>
+    <nav>
+      <a id="backToMovieLink" href="movie.html">&larr; Back to Details</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <h1 class="page-title">💺 Select Your Seats</h1>
+    
+    <div id="loading" class="spinner"></div>
+
+    <div id="seatsLayout" class="seats-layout" style="display: none;">
+      <!-- Left: Screen & Seat Matrix -->
+      <div class="cinema-screen-container">
+        <div class="screen"></div>
+        <div class="screen-text">SCREEN THIS WAY</div>
+
+        <div id="seatMatrix" class="seat-matrix"></div>
+
+        <div class="seat-legend">
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-available);"></div>
+            <span>Available</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-selected);"></div>
+            <span>Selected</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-booked);"></div>
+            <span>Booked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Booking Summary & Checkout Form -->
+      <div class="booking-summary-panel">
+        <h2 style="font-size: 20px; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">Booking Summary</h2>
+        
+        <div>
+          <div style="font-size: 18px; font-weight: 600;" id="movieTitleSummary">Loading...</div>
+          <div style="font-size: 14px; color: var(--text-muted); margin-top: 4px;" id="showtimeSummary">Showtime: --</div>
+        </div>
+
+        <div class="form-group">
+          <label for="custName">Your Name</label>
+          <input type="text" id="custName" class="form-control" placeholder="e.g. Alex Johnson" required />
+        </div>
+
+        <div class="form-group">
+          <label for="custEmail">Email Address</label>
+          <input type="email" id="custEmail" class="form-control" placeholder="e.g. alex@example.com" required />
+        </div>
+
+        <div class="summary-row">
+          <span>Ticket Price</span>
+          <span id="ticketPriceSpan">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>Selected Seats</span>
+          <span id="selectedSeatsSpan" style="font-weight: 600; color: white;">None</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total Amount</span>
+          <span id="totalPriceSpan">₹0</span>
+        </div>
+
+        <button id="confirmBtn" class="btn-primary" disabled>Confirm Booking</button>
+        <p id="errorMsg" style="color: #ef4444; font-size: 13px; text-align: center; display: none;"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let selectedMovie = null;
+    let selectedShowtime = '';
+    let ticketPrice = 150;
+    let bookedSeats = [];
+    let selectedSeats = [];
+
+    const rows = ['A', 'B', 'C', 'D', 'E'];
+    const seatsPerRow = 8;
+
+    async function initSeatPage() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const movieId = urlParams.get('movieId') || localStorage.getItem('selectedMovieId');
+      selectedShowtime = urlParams.get('showtime') || localStorage.getItem('selectedShowtime');
+
+      const loading = document.getElementById('loading');
+      const seatsLayout = document.getElementById('seatsLayout');
+
+      if (!movieId || !selectedShowtime) {
+        loading.style.display = 'none';
+        alert('Please select a movie and showtime first.');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      document.getElementById('backToMovieLink').href = `movie.html?id=${movieId}`;
+
+      try {
+        // 1. Fetch movie details
+        const movieRes = await fetch(`/api/movies/${movieId}`);
+        const movieData = await movieRes.json();
+
+        if (!movieData.success) {
+          throw new Error('Movie not found');
+        }
+        selectedMovie = movieData.movie;
+        ticketPrice = selectedMovie.ticketPrice || 150;
+
+        document.getElementById('movieTitleSummary').textContent = selectedMovie.title;
+        document.getElementById('showtimeSummary').textContent = `Showtime: 🕒 ${selectedShowtime}`;
+        document.getElementById('ticketPriceSpan').textContent = `₹${ticketPrice}`;
+
+        // 2. Fetch currently booked seats from API
+        const seatsRes = await fetch(`/api/seats?movieId=${movieId}&showtime=${encodeURIComponent(selectedShowtime)}`);
+        const seatsData = await seatsRes.json();
+        bookedSeats = seatsData.bookedSeats || [];
+
+        loading.style.display = 'none';
+        seatsLayout.style.display = 'grid';
+
+        renderMatrix();
+
+      } catch (err) {
+        console.error(err);
+        loading.style.display = 'none';
+        document.querySelector('.container').innerHTML = '<p style="text-align: center;">Error loading seats. Please go back and try again.</p>';
+      }
+    }
+
+    function renderMatrix() {
+      const seatMatrix = document.getElementById('seatMatrix');
+      seatMatrix.innerHTML = '';
+
+      rows.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.classList.add('seat-row');
+
+        const label = document.createElement('div');
+        label.classList.add('row-label');
+        label.textContent = row;
+        rowDiv.appendChild(label);
+
+        for (let i = 1; i <= seatsPerRow; i++) {
+          const seatId = `${row}${i}`;
+          const seat = document.createElement('div');
+          seat.classList.add('seat');
+          seat.textContent = i;
+
+          if (bookedSeats.includes(seatId)) {
+            seat.classList.add('booked');
+            seat.title = 'Seat already booked';
+          }
+
+          seat.addEventListener('click', () => {
+            if (seat.classList.contains('booked')) return;
+
+            if (seat.classList.contains('selected')) {
+              seat.classList.remove('selected');
+              selectedSeats = selectedSeats.filter(s => s !== seatId);
+            } else {
+              seat.classList.add('selected');
+              selectedSeats.push(seatId);
+            }
+            updateSummary();
+          });
+
+          rowDiv.appendChild(seat);
+        }
+        seatMatrix.appendChild(rowDiv);
+      });
+    }
+
+    function updateSummary() {
+      const selectedSeatsSpan = document.getElementById('selectedSeatsSpan');
+      const totalPriceSpan = document.getElementById('totalPriceSpan');
+      const confirmBtn = document.getElementById('confirmBtn');
+
+      if (selectedSeats.length > 0) {
+        selectedSeatsSpan.textContent = selectedSeats.join(', ');
+        totalPriceSpan.textContent = `₹${selectedSeats.length * ticketPrice}`;
+        confirmBtn.disabled = false;
+      } else {
+        selectedSeatsSpan.textContent = 'None';
+        totalPriceSpan.textContent = '₹0';
+        confirmBtn.disabled = true;
+      }
+    }
+
+    document.getElementById('confirmBtn').addEventListener('click', async () => {
+      const custName = document.getElementById('custName').value.trim();
+      const custEmail = document.getElementById('custEmail').value.trim();
+      const errorMsg = document.getElementById('errorMsg');
+      const confirmBtn = document.getElementById('confirmBtn');
+
+      if (!custName) {
+        errorMsg.textContent = 'Please enter your name.';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      errorMsg.style.display = 'none';
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Processing...';
+
+      try {
+        const payload = {
+          movieId: selectedMovie.id,
+          showtime: selectedShowtime,
+          seats: selectedSeats,
+          customerName: custName,
+          customerEmail: custEmail
+        };
+
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Booking failed');
+        }
+
+        // Navigate to confirmation page with booking ID
+        window.location.href = `confirmation.html?bookingId=${data.booking.bookingId}`;
+
+      } catch (err) {
+        console.error('Booking Error:', err);
+        errorMsg.textContent = err.message || 'Failed to complete booking. Try again.';
+        errorMsg.style.display = 'block';
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Confirm Booking';
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', initSeatPage);
+  </script>
+</body>
+</html>

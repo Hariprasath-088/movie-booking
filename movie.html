@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookMyShow - Movie Details</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">
+      🎬 <span>BookMyShow</span>
+    </a>
+    <nav>
+      <a href="index.html">&larr; Back to Movies</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div id="loading" class="spinner"></div>
+    <div id="movieDetailContainer"></div>
+  </div>
+
+  <script>
+    async function loadMovieDetails() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let movieId = urlParams.get('id') || localStorage.getItem('selectedMovieId');
+
+      const loading = document.getElementById('loading');
+      const container = document.getElementById('movieDetailContainer');
+
+      if (!movieId) {
+        loading.style.display = 'none';
+        container.innerHTML = '<p style="text-align: center;">No movie selected. <a href="index.html" style="color: var(--primary);">Go back to home</a></p>';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/movies/${movieId}`);
+        const data = await response.json();
+
+        loading.style.display = 'none';
+
+        if (!data.success || !data.movie) {
+          container.innerHTML = '<p style="text-align: center;">Movie not found. <a href="index.html" style="color: var(--primary);">Go back</a></p>';
+          return;
+        }
+
+        const movie = data.movie;
+        localStorage.setItem('selectedMovieId', movie.id);
+
+        container.innerHTML = `
+          <div class="movie-detail-card">
+            <img src="${movie.poster}" alt="${movie.title}" class="detail-poster" />
+            <div class="detail-info">
+              <h1 class="detail-title">${movie.title}</h1>
+              
+              <div class="badge-list">
+                <span class="badge">⭐ ${movie.rating} / 10</span>
+                <span class="badge">⏱️ ${movie.duration}</span>
+                <span class="badge">🏷️ ${movie.genre}</span>
+                <span class="badge">💰 ₹${movie.ticketPrice} per seat</span>
+              </div>
+
+              <div>
+                <div class="section-label">Synopsis</div>
+                <p class="synopsis">${movie.synopsis}</p>
+              </div>
+
+              <div>
+                <div class="section-label">Select Show Time:</div>
+                <div class="showtime-grid">
+                  ${movie.showtimes.map(time => `<button class="showtime-btn" data-time="${time}">${time}</button>`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Add click handler for showtimes
+        document.querySelectorAll('.showtime-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const selectedTime = btn.getAttribute('data-time');
+            localStorage.setItem('selectedShowtime', selectedTime);
+            window.location.href = `seats.html?movieId=${movie.id}&showtime=${encodeURIComponent(selectedTime)}`;
+          });
+        });
+
+      } catch (error) {
+        console.error('Error fetching movie details:', error);
+        loading.style.display = 'none';
+        container.innerHTML = '<p style="text-align: center;">Error loading movie details from server.</p>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadMovieDetails);
+  </script>
+</body>
+</html>

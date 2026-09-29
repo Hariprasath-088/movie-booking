@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  bookmyshow:
+    build: .
+    container_name: bookmyshow-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist booking database on host
+      - ./data:/app/data

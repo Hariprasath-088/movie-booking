@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookMyShow - Booking Confirmation</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <a href="index.html" class="logo">
+      🎬 <span>BookMyShow</span>
+    </a>
+    <nav>
+      <a href="index.html">&larr; Home</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div id="loading" class="spinner"></div>
+
+    <div id="confirmationContainer"></div>
+  </div>
+
+  <script>
+    async function loadConfirmation() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const bookingId = urlParams.get('bookingId');
+      const loading = document.getElementById('loading');
+      const container = document.getElementById('confirmationContainer');
+
+      if (!bookingId) {
+        loading.style.display = 'none';
+        container.innerHTML = '<p style="text-align: center;">Booking information missing. <a href="index.html" style="color: var(--primary);">Go to Homepage</a></p>';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/bookings/${bookingId}`);
+        const data = await res.json();
+
+        loading.style.display = 'none';
+
+        if (!res.ok || !data.success || !data.booking) {
+          container.innerHTML = '<p style="text-align: center;">Booking record not found. <a href="index.html" style="color: var(--primary);">Go to Homepage</a></p>';
+          return;
+        }
+
+        const booking = data.booking;
+
+        container.innerHTML = `
+          <div class="ticket-card">
+            <div class="ticket-header">
+              <h2>🎉 Booking Confirmed!</h2>
+              <p>Show this e-ticket at the theater entrance</p>
+            </div>
+            <div class="ticket-body">
+              <div class="ticket-movie-header">
+                <img src="${booking.poster || 'b.jpg'}" alt="${booking.movieTitle}" class="ticket-poster" />
+                <div>
+                  <h3 style="font-size: 22px; font-weight: 700; color: white;">${booking.movieTitle}</h3>
+                  <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Ref ID: <strong style="color: var(--primary);">${booking.bookingId}</strong></p>
+                  <p style="font-size: 13px; color: #cbd5e1; margin-top: 2px;">Guest: ${booking.customerName}</p>
+                </div>
+              </div>
+
+              <div class="ticket-details-grid">
+                <div class="ticket-detail-item">
+                  <label>Showtime</label>
+                  <span>🕒 ${booking.showtime}</span>
+                </div>
+                <div class="ticket-detail-item">
+                  <label>Seats</label>
+                  <span style="color: var(--primary); font-size: 17px;">💺 ${booking.seats.join(', ')}</span>
+                </div>
+                <div class="ticket-detail-item">
+                  <label>Total Price</label>
+                  <span>₹${booking.totalAmount}</span>
+                </div>
+                <div class="ticket-detail-item">
+                  <label>Status</label>
+                  <span style="color: #22c55e;">Confirmed</span>
+                </div>
+              </div>
+
+              <div class="barcode-strip">
+                <div class="barcode">||| | |||| | ||||| | ||| ||</div>
+                <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase;">Ticket Reference: ${booking.bookingId}</div>
+              </div>
+
+              <button onclick="window.location.href='index.html'" class="btn-primary" style="margin-top: 10px;">
+                🍿 Book Another Ticket
+              </button>
+            </div>
+          </div>
+        `;
+
+        // Clear local cache for fresh selection next time
+        localStorage.removeItem('selectedSeats');
+
+      } catch (err) {
+        console.error(err);
+        loading.style.display = 'none';
+        container.innerHTML = '<p style="text-align: center;">Error loading ticket details.</p>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadConfirmation);
+  </script>
+</body>
+</html>
